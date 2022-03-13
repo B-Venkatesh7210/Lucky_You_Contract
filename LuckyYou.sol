@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 //0xDA0bab807633f07f013f94DD0E6A4F96F8742B53
 
 import "@openzeppelin/contracts/utils/Counters.sol";
-// import "https://raw.githubusercontent.com/smartcontractkit/chainlink/master/evm-contracts/src/v0.6/VRFConsumerBase.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
 contract LuckyYou is VRFConsumerBase
 {
@@ -14,6 +14,7 @@ contract LuckyYou is VRFConsumerBase
     using Counters for Counters.Counter;
     Counters.Counter private giveawayNumber;
     bytes32 public keyHash;
+    uint256 public fee;
     uint256 public randomWinner;
     
     
@@ -55,7 +56,7 @@ contract LuckyYou is VRFConsumerBase
         uint256 deadline;
         uint256 timestamp;
         uint amount;
-        address[] participants;
+        address[] payable participants;
         bool isLive;
     }
 
@@ -71,8 +72,8 @@ contract LuckyYou is VRFConsumerBase
         
     }
 
-    function endGiveaway(uint256 giveawayId) public{
-        require(giveawayMap[giveawayId].uniqueId!=0, "Giveaway doesn't exist");
+    function endGiveaway(uint256 giveawayId) public giveawayExist(giveawayId) {
+        
         Giveaway storage currGiveaway = giveawayMap[giveawayId];
         require(currGiveaway.creator==msg.sender || msg.sender == owner); 
         require(currGiveaway.deadline<=block.timestamp, "Deadline not reached");
@@ -80,12 +81,27 @@ contract LuckyYou is VRFConsumerBase
         giveawayMap[giveawayId].isLive=false;
     } 
 
-    function participate(uint256 giveawayId) public payable {
-        require(giveawayMap[giveawayId].uniqueId!=0, "Giveaway doesn't exist");
+    function participate(uint256 giveawayId) public giveawayExist(giveawayId) payable {
+        
         Giveaway storage currGiveaway = giveawayMap[giveawayId];
         uint fee = currGiveaway.amount/100;
         require(fee>=msg.value, "Insufficient fee");
-        currGiveaway.participants.push(msg.sender);
+        currGiveaway.participants.push(payable(msg.sender));
+    }
+
+    function getParticipants(uint256 giveawayId) public giveawayExist(giveawayId) view returns (address[] payable memory) {
+
+        return giveawayMap[giveawayId].participants;
+
+    }
+
+    function pickWinner(uint256 giveawayId) public giveawayExist(giveawayId) {
+
+        Giveaway storage currGiveaway = giveawayMap[giveawayId];
+        uint index = getRandomNumber() % currGiveaway.participants.length;
+        withdraw(currGiveaway.amount, currGiveaway.participants[index]);
+        
+
     }
 
 
@@ -102,6 +118,12 @@ contract LuckyYou is VRFConsumerBase
             currIndex += 1;
         }
         return items;
+    }
+
+    modifier giveawayExist(giveawayId) {
+        require(giveawayMap[giveawayId].uniqueId!=0, "Giveaway doesn't exist");
+        _;
+
     }
 }
 
