@@ -22,6 +22,9 @@ contract LuckyYou is VRFConsumerBase
     uint256 internal fee;
     address vrfCoordinator = 0x8C7382F9D8f56b33781fE506E897a4F1e2d17255;
     address link = 	0x326C977E6efc84E512bB9C30f76E30c160eD06FB;
+    uint256 public randomResult; //remove later
+    uint public currGiveawayId=0;
+    bool public isLocked=false;
 
     
     
@@ -29,7 +32,7 @@ contract LuckyYou is VRFConsumerBase
 
 
     constructor() VRFConsumerBase(vrfCoordinator, link) payable {
-        keyHash = 	0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4;
+        keyHash = 0x6e75b569a01ef56d18cab6a8e71e6600d6ce853834d4a5748b720d06f878b3a4;
         fee = 0.1 * 10 ** 18; 
         
         owner = msg.sender;
@@ -54,6 +57,7 @@ contract LuckyYou is VRFConsumerBase
         uint amount;
         address[] participants;
         bool isLive;
+        address winner;
     }
 
     mapping (uint256 => Giveaway) public giveawayMap;
@@ -66,7 +70,7 @@ contract LuckyYou is VRFConsumerBase
         giveawayNumber.increment();
         
         uint256 newGiveawayNumber = giveawayNumber.current();
-        giveawayMap[newGiveawayNumber] = Giveaway(msg.sender, newGiveawayNumber, _message, _deadline, block.timestamp, msg.value, empty, true);
+        giveawayMap[newGiveawayNumber] = Giveaway(msg.sender, newGiveawayNumber, _message, _deadline, block.timestamp, msg.value, empty, true, address(0));
         
     }
 
@@ -87,19 +91,14 @@ contract LuckyYou is VRFConsumerBase
     }
 
     function endGiveaway(uint256 giveawayId) public giveawayExist(giveawayId) {
-        
+        require(isLocked==false, "Please try again later");
         Giveaway storage currGiveaway = giveawayMap[giveawayId];
         require(currGiveaway.creator==msg.sender || msg.sender == owner, "tu koi aur hai"); 
         // require(currGiveaway.deadline<=block.timestamp, "Deadline not reached");
         require(currGiveaway.isLive==true, "Giveaway already ended");
-        // uint index = random(giveawayId)%currGiveaway.participants.length;
-        // payable(currGiveaway.participants[index]).transfer(currGiveaway.amount);
+        currGiveawayId = giveawayId;
+        isLocked=true;
         getRandomNumber();
-        giveawayMap[giveawayId].isLive=false;
-    }
-
-    function payWinner() internal {
-        uint index = randomResult %  
     }
 
     modifier giveawayExist(uint256 giveawayId) {
@@ -119,9 +118,15 @@ contract LuckyYou is VRFConsumerBase
     }
 
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
-        uint256 randomResult = randomness;
-        payWinner()
-    }
+        randomResult = randomness; 
+        Giveaway storage currGiveaway = giveawayMap[currGiveawayId];
+        uint index = randomness%currGiveaway.participants.length;
+        payable(currGiveaway.participants[index]).transfer(currGiveaway.amount);
+        giveawayMap[currGiveawayId].isLive=false;
+        isLocked=false;
+        currGiveawayId=0;
+        giveawayMap[currGiveawayId].winner=currGiveaway.participants[index];
+        }
 
   function random(uint256 giveawayId) private view returns (uint) {
       Giveaway storage currGiveaway = giveawayMap[giveawayId];
