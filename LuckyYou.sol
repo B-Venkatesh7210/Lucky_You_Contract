@@ -147,5 +147,7 @@ contract LuckyYou is VRFConsumerBase
         }
         return items;
     }
+
+    //Function changeOwner, unlockContract, 
 }
 
