@@ -176,10 +176,7 @@ contract LuckyYou is VRFConsumerBase, OpsReady
         require(currGiveaway.creator==msg.sender || msg.sender == owner || msg.sender == opsAddress, "tu koi aur hai"); 
         require(currGiveaway.deadline<=block.timestamp, "Deadline not reached");
         require(currGiveaway.isLive==true, "Giveaway already ended");
-        if(currGiveaway.participants.length==0)
-        {
-            payable(currGiveaway.creator).transfer(currGiveaway.amount);
-        }
+        
 
         uint256 fees;
         address feeToken;
@@ -210,9 +207,16 @@ contract LuckyYou is VRFConsumerBase, OpsReady
 
     function fulfillRandomness(bytes32 requestId, uint256 randomness) internal override {
         Giveaway storage currGiveaway = giveawayMap[currGiveawayId];
-        uint index = randomness%currGiveaway.participants.length;
-        payable(currGiveaway.participants[index]).transfer(currGiveaway.amount);
-        giveawayMap[currGiveawayId].winner=currGiveaway.participants[index];
+        if(currGiveaway.participants.length==0)
+        {
+            payable(currGiveaway.creator).transfer(currGiveaway.amount);
+        }
+        else {
+            uint index = randomness%currGiveaway.participants.length;
+            payable(currGiveaway.participants[index]).transfer(currGiveaway.amount);
+            giveawayMap[currGiveawayId].winner=currGiveaway.participants[index];
+        }
+        
         giveawayMap[currGiveawayId].isLive=false;
         isLocked=false;
         currGiveawayId=0;
@@ -361,9 +365,22 @@ contract LuckyYou is VRFConsumerBase, OpsReady
         currGiveawayId=0;
     }
 
-    // function getFees() onlyOwner {
-    //     payable(owner).transfer()
-    // } 
+    function getFees(uint percentage) public onlyOwner {
+        uint totalGiveaways = giveawayNumber.current();
+        uint totalLiveAmount = 0; 
+        for(uint i=0 ; i<totalGiveaways ; i++)
+        {
+            uint currId = giveawayMap[i+1].uniqueId;
+            Giveaway storage currGiveaway = giveawayMap[currId];
+            if(currGiveaway.isLive==true)
+            {
+                totalLiveAmount += currGiveaway.amount;
+            }
+
+        }
+        uint remainingFees = (address(this).balance - totalLiveAmount)/percentage;
+        payable(owner).transfer(remainingFees);
+    } 
 
 }
 
