@@ -59,9 +59,9 @@ contract LuckyYou is VRFConsumerBase, OpsReady
 
     bytes32 internal keyHash;
     uint256 internal fee;
-    address vrfCoordinator = 0xb3dCcb4Cf7a26f6cf6B120Cf5A73875B7BBc655B;
-    address link = 	0x01BE23585060835E02B77ef475b0Cc51aA1e0709;
-    address opsAddress = 0x8c089073A9594a4FB03Fa99feee3effF0e2Bc58a; 
+    address vrfCoordinator = 0x3d2341ADb2D31f1c5530cDC622016af293177AE0;
+    address link = 	0xb0897686c545045aFc77CF20eC7A532E3120E0F1;
+    address opsAddress = 0x527a819db1eb0e34426297b03bae11F2f8B3A19E; 
     uint public currGiveawayId=0;
     bool public isLocked=false;
 
@@ -71,8 +71,8 @@ contract LuckyYou is VRFConsumerBase, OpsReady
 
 
     constructor() VRFConsumerBase(vrfCoordinator, link) OpsReady(opsAddress) payable {
-        keyHash = 0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311;
-        fee = 0.1 * 10 ** 18; 
+        keyHash = 0xf86195cf7690c55907b2b611ebb7343a6f649bff128701cc542f0569e2c549da;
+        fee = 0.1 * 10 ** 15;
         owner = msg.sender;
         }
 
@@ -88,7 +88,8 @@ contract LuckyYou is VRFConsumerBase, OpsReady
         address[] participants,
         bool isLive,
         address winner,
-        bytes32 taskId
+        bytes32 taskId,
+        bool isProcessing
     );
 
     event GiveawayParticipated(
@@ -130,6 +131,7 @@ contract LuckyYou is VRFConsumerBase, OpsReady
         bool isLive;
         address winner;
         bytes32 taskId;
+        bool isProcessing;
     }
 
     mapping (uint256 => Giveaway) public giveawayMap;
@@ -149,14 +151,15 @@ contract LuckyYou is VRFConsumerBase, OpsReady
             abi.encodeWithSelector(this.checker.selector, newGiveawayNumber),
             ETH
         );
-        giveawayMap[newGiveawayNumber] = Giveaway(msg.sender, newGiveawayNumber, _message, _socialLink, _deadline, block.timestamp, msg.value, _participationFee, empty, true, address(0), tempTaskId);
-        emit GiveawayCreated(msg.sender, newGiveawayNumber, _message, _socialLink, _deadline, block.timestamp, msg.value, _participationFee, empty, true, address(0), tempTaskId);
+        giveawayMap[newGiveawayNumber] = Giveaway(msg.sender, newGiveawayNumber, _message, _socialLink, _deadline, block.timestamp, msg.value, _participationFee, empty, true, address(0), tempTaskId, false);
+        emit GiveawayCreated(msg.sender, newGiveawayNumber, _message, _socialLink, _deadline, block.timestamp, msg.value, _participationFee, empty, true, address(0), tempTaskId, false);
     }
 
     function participate(uint256 giveawayId) public giveawayExist(giveawayId) payable {
         
         Giveaway storage currGiveaway = giveawayMap[giveawayId];
         require(currGiveaway.isLive==true, "Giveaway has been finished");
+        require(currGiveaway.deadline>=block.timestamp, "Giveaway time is over");
         for(uint i=0 ; i<currGiveaway.participants.length ; i++)
         {
             require(currGiveaway.participants[i]!=msg.sender, "You cannot participate twice");
@@ -176,6 +179,8 @@ contract LuckyYou is VRFConsumerBase, OpsReady
         require(currGiveaway.creator==msg.sender || msg.sender == owner || msg.sender == opsAddress, "tu koi aur hai"); 
         require(currGiveaway.deadline<=block.timestamp, "Deadline not reached");
         require(currGiveaway.isLive==true, "Giveaway already ended");
+        giveawayMap[giveawayId].isProcessing = true;
+        
         
 
         uint256 fees;
@@ -217,6 +222,7 @@ contract LuckyYou is VRFConsumerBase, OpsReady
             giveawayMap[currGiveawayId].winner=currGiveaway.participants[index];
         }
         
+        giveawayMap[currGiveawayId].isProcessing=false;
         giveawayMap[currGiveawayId].isLive=false;
         isLocked=false;
         currGiveawayId=0;
@@ -351,9 +357,7 @@ contract LuckyYou is VRFConsumerBase, OpsReady
             giveawayId
         );
     }
-    // getFees(only owner, send fees to owner, only live giveaways in %),
 
-    //Endgiveaway(event), participate(event)
 
     function changeOwner(address newAddress) public onlyOwner returns (address) {
         owner = newAddress;
